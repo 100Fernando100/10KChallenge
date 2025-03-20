@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>The $10,000 Challenge</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+        h1 { color: #333; }
+        table { margin: 20px auto; border-collapse: collapse; width: 80%; }
+        th, td { border: 1px solid #ccc; padding: 12px; text-align: left; }
+        th { background-color: #f0f0f0; font-weight: bold; }
+        .avatar { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>The $10,000 Challenge - Live Standings</h1>
+    <p>Prices update live via CoinGecko. Refresh to see the latest!</p>
+    <div id="standings"></div>
+    <script>
+        // Fetch live prices from CoinGecko
+        fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,cardano,ripple,dogecoin,shiba-inu,pax-gold,solana,tether&vs_currencies=usd')
+            .then(response => response.json())
+            .then(data => {
+                // Define avatars with entry prices (March 19, 2025)
+                const entryPrices = {
+                    "bitcoin": 82047.50,
+                    "ethereum": 1907.33,
+                    "cardano": 0.69,
+                    "ripple": 2.26,
+                    "dogecoin": 0.17,
+                    "shiba-inu": 0.000013,
+                    "pax-gold": 2400,
+                    "solana": 126,
+                    "tether": 1.00
+                };
+                const avatars = [
+                    { name: "Alex 'Cycle Master'", investments: { "bitcoin": 6000, "ethereum": 4000 } },
+                    { name: "Priya 'Tech Wizard'", investments: { "bitcoin": 5000, "cardano": 3000, "ripple": 2000 } },
+                    { name: "Liam 'Global Eye'", investments: { "bitcoin": 7000, "tether": 2000, "pax-gold": 1000 } },
+                    { name: "Zoe 'Leverage Queen'", investments: { "bitcoin": -5000, "dogecoin": 3000, "shiba-inu": 2000 } }
+                ];
+
+                // Build the table
+                let html = "<table><tr><th>Trader</th><th>Investments</th><th>Total Value</th></tr>";
+                avatars.forEach(player => {
+                    let total = 0;
+                    let details = "";
+                    for (let coin in player.investments) {
+                        let amount = player.investments[coin];
+                        let entryPrice = entryPrices[coin];
+                        let currentPrice = data[coin].usd;
+                        let leverage = 1;
+                        if (player.name === "Zoe 'Leverage Queen'") {
+                            leverage = (coin === "bitcoin" && amount < 0) ? 10 : (coin === "dogecoin") ? 5 : 1;
+                        }
+                        // Calculate units bought/shorted at entry price
+                        let units = amount / entryPrice;
+                        // Current value without leverage
+                        let value = units * currentPrice;
+                        // Apply leverage to gains/losses (not principal)
+                        let leveragedValue = amount + (value - amount) * leverage;
+                        total += leveragedValue;
+                        details += `${coin.toUpperCase()}: $${amount.toFixed(2)} → $${leveragedValue.toFixed(2)}<br>`;
+                    }
+                    html += `<tr><td class="avatar">${player.name}</td><td>${details}</td><td>$${total.toFixed(2)}</td></tr>`;
+                });
+                html += "</table>";
+                document.getElementById("standings").innerHTML = html;
+            })
+            .catch(error => {
+                document.getElementById("standings").innerHTML = "Oops! Couldn’t load prices. Try refreshing.";
+                console.error(error);
+            });
+    </script>
+</body>
+</html>
