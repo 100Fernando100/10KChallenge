@@ -47,8 +47,9 @@
                     { name: "Zoe 'Leverage Queen'", investments: { "bitcoin": -5000, "dogecoin": 3000, "shiba-inu": 2000 } }
                 ];
 
-                // Load existing log from localStorage
+                // Load existing log and previous totals from localStorage
                 let log = JSON.parse(localStorage.getItem('challengeLog')) || [];
+                let previousTotals = JSON.parse(localStorage.getItem('previousTotals')) || {};
 
                 // Build the table
                 let html = "<table><tr><th>Trader</th><th>Investments</th><th>Total Value</th></tr>";
@@ -77,10 +78,30 @@
                         details += `${coin.toUpperCase()}: $${amount.toFixed(2)} → $${leveragedValue.toFixed(2)}<br>`;
                     }
 
-                    // Check if total crosses $0 or -$10,000 and log the event
+                    // Check for huge changes (10% or more)
                     const timestamp = new Date().toLocaleString();
+                    const previousTotal = previousTotals[player.name] || 10000; // Default to starting $10,000 if no previous total
+                    const percentageChange = previousTotal !== 0 ? Math.abs((total - previousTotal) / previousTotal) * 100 : 0;
+                    if (percentageChange >= 10) {
+                        const alreadyLoggedChange = log.some(entry => 
+                            entry.name === player.name && 
+                            entry.event === 'hugeChange' && 
+                            entry.total === total.toFixed(2) && 
+                            entry.timestamp === timestamp
+                        );
+                        if (!alreadyLoggedChange) {
+                            log.push({
+                                name: player.name,
+                                event: 'hugeChange',
+                                total: total.toFixed(2),
+                                percentageChange: percentageChange.toFixed(2),
+                                timestamp: timestamp
+                            });
+                        }
+                    }
+
+                    // Check if total crosses $0 or -$10,000 and log the event
                     if (total <= 0 && total > -10000) {
-                        // Check if this trader has already been logged for hitting $0
                         const alreadyLoggedZero = log.some(entry => entry.name === player.name && entry.event === 'hitZero');
                         if (!alreadyLoggedZero) {
                             log.push({
@@ -92,7 +113,6 @@
                         }
                     }
                     if (total <= -10000) {
-                        // Check if this trader has already been logged for elimination
                         const alreadyLoggedEliminated = log.some(entry => entry.name === player.name && entry.event === 'eliminated');
                         if (!alreadyLoggedEliminated) {
                             log.push({
@@ -113,11 +133,15 @@
                     // Apply negative class if total is negative
                     let totalClass = total < 0 ? "negative" : "";
                     html += `<tr><td class="avatar">${player.name}${status}</td><td>${details}</td><td class="${totalClass}">$${total.toFixed(2)}</td></tr>`;
+
+                    // Update previous total for this trader
+                    previousTotals[player.name] = total;
                 });
                 html += "</table>";
 
-                // Save the updated log to localStorage
+                // Save the updated log and previous totals to localStorage
                 localStorage.setItem('challengeLog', JSON.stringify(log));
+                localStorage.setItem('previousTotals', JSON.stringify(previousTotals));
 
                 // Display the log
                 let logHtml = "<h3>Event Log</h3>";
@@ -125,7 +149,9 @@
                     logHtml += "<p>No events yet.</p>";
                 } else {
                     log.forEach(entry => {
-                        if (entry.event === 'hitZero') {
+                        if (entry.event === 'hugeChange') {
+                            logHtml += `<p class="log-entry">${entry.name}'s portfolio changed by ${entry.percentageChange}% to $${entry.total} on ${entry.timestamp}!</p>`;
+                        } else if (entry.event === 'hitZero') {
                             logHtml += `<p class="log-entry">${entry.name} hit $0 or below ($${entry.total}) on ${entry.timestamp}!</p>`;
                         } else if (entry.event === 'eliminated') {
                             logHtml += `<p class="log-entry">${entry.name} was eliminated ($${entry.total}) on ${entry.timestamp}!</p>`;
