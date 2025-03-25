@@ -12,7 +12,7 @@
             padding: 20px;
             background-color: #f5f5f5;
         }
-        h1, h2 {
+        h1, h2, h3 {
             color: #333;
             text-align: center;
         }
@@ -42,6 +42,10 @@
         tr:hover {
             background-color: #f1f1f1;
         }
+        .avatar { font-weight: bold; }
+        .negative { color: red; font-weight: bold; }
+        .status { font-size: 0.9em; color: #666; }
+        .liquidation-note { color: red; font-style: italic; text-align: center; }
         #negative-comments p {
             color: red;
             font-style: italic;
@@ -62,13 +66,18 @@
             margin: 0 0 10px 0;
             color: #4CAF50;
         }
+        .log { margin-top: 20px; font-size: 0.9em; color: #333; border-top: 1px solid #ccc; padding-top: 10px; }
+        .log-entry { color: #d32f2f; }
     </style>
 </head>
 <body>
     <h1>The $10,000 Challenge - Live Standings</h1>
     <p>Prices update live via CoinGecko. Refresh to see the latest!</p>
+    <p>Rule: Traders are out if their portfolio drops below -$10,000!</p>
+    <p class="liquidation-note">Note: In real-world trading, a negative balance would trigger liquidation (positions closed to prevent further losses), but for this game, we allow traders to continue until -$10,000.</p>
     <div id="standings"></div>
     <div id="negative-comments"></div>
+    <div id="log" class="log"></div>
 
     <h2>Daily Crypto Trades at 4 PM</h2>
     <p>Check out what each trader decided to do today at 4 PM!</p>
@@ -103,6 +112,10 @@
                         { name: "Zoe 'Leverage Queen'", investments: { "bitcoin": -5000, "dogecoin": 3000, "shiba-inu": 2000 } }
                     ];
 
+                    // Load existing log and previous totals from localStorage
+                    let log = JSON.parse(localStorage.getItem('challengeLog')) || [];
+                    let previousTotals = JSON.parse(localStorage.getItem('previousTotals')) || {};
+
                     let html = "<table><tr><th>Trader</th><th>Investments</th><th>Total Value</th></tr>";
                     const negativeComments = document.getElementById('negative-comments');
                     avatars.forEach(player => {
@@ -122,8 +135,67 @@
                             total += leveragedValue;
                             details += `${coin.toUpperCase()}: $${amount.toFixed(2)} → $${leveragedValue.toFixed(2)}<br>`;
                         }
-                        html += `<tr><td>${player.name}</td><td>${details}</td><td>$${total.toFixed(2)}</td></tr>`;
 
+                        // Check for huge changes (10% or more)
+                        const timestamp = new Date().toLocaleString();
+                        const previousTotal = previousTotals[player.name] || 10000; // Default to starting $10,000 if no previous total
+                        const percentageChange = previousTotal !== 0 ? Math.abs((total - previousTotal) / previousTotal) * 100 : 0;
+                        if (percentageChange >= 10) {
+                            const alreadyLoggedChange = log.some(entry => 
+                                entry.name === player.name && 
+                                entry.event === 'hugeChange' && 
+                                entry.total === total.toFixed(2) && 
+                                entry.timestamp === timestamp
+                            );
+                            if (!alreadyLoggedChange) {
+                                log.push({
+                                    name: player.name,
+                                    event: 'hugeChange',
+                                    total: total.toFixed(2),
+                                    percentageChange: percentageChange.toFixed(2),
+                                    timestamp: timestamp
+                                });
+                            }
+                        }
+
+                        // Check if total crosses $0 or -$10,000 and log the event
+                        if (total <= 0 && total > -10000) {
+                            const alreadyLoggedZero = log.some(entry => entry.name === player.name && entry.event === 'hitZero');
+                            if (!alreadyLoggedZero) {
+                                log.push({
+                                    name: player.name,
+                                    event: 'hitZero',
+                                    total: total.toFixed(2),
+                                    timestamp: timestamp
+                                });
+                            }
+                        }
+                        if (total <= -10000) {
+                            const alreadyLoggedEliminated = log.some(entry => entry.name === player.name && entry.event === 'eliminated');
+                            if (!alreadyLoggedEliminated) {
+                                log.push({
+                                    name: player.name,
+                                    event: 'eliminated',
+                                    total: total.toFixed(2),
+                                    timestamp: timestamp
+                                });
+                            }
+                        }
+
+                        // Add status message if negative
+                        let status = total < 0 ? `<br><span class="status">At risk! Needs $${(10000 + total).toFixed(2)} to get back to $10,000.</span>` : "";
+                        if (total <= -10000) {
+                            status = `<br><span class="status">Eliminated! Portfolio below -$10,000.</span>`;
+                            total = 0; // Set to 0 for display purposes if eliminated
+                        }
+                        // Apply negative class if total is negative
+                        let totalClass = total < 0 ? "negative" : "";
+                        html += `<tr><td class="avatar">${player.name}${status}</td><td>${details}</td><td class="${totalClass}">$${total.toFixed(2)}</td></tr>`;
+
+                        // Update previous total for this trader
+                        previousTotals[player.name] = total;
+
+                        // Add negative comments (from local version)
                         if (total < 0) {
                             const comment = document.createElement('p');
                             const initialValue = 10000;
@@ -143,6 +215,29 @@
                         }
                     });
                     html += "</table>";
+
+                    // Save the updated log and previous totals to localStorage
+                    localStorage.setItem('challengeLog', JSON.stringify(log));
+                    localStorage.setItem('previousTotals', JSON.stringify(previousTotals));
+
+                    // Display the log
+                    let logHtml = "<h3>Event Log</h3>";
+                    if (log.length === 0) {
+                        logHtml += "<p>No events yet.</p>";
+                    } else {
+                        log.forEach(entry => {
+                            if (entry.event === 'hugeChange') {
+                                logHtml += `<p class="log-entry">${entry.name}'s portfolio changed by ${entry.percentageChange}% to $${entry.total} on ${entry.timestamp}!</p>`;
+                            } else if (entry.event === 'hitZero') {
+                                logHtml += `<p class="log-entry">${entry.name} hit $0 or below ($${entry.total}) on ${entry.timestamp}!</p>`;
+                            } else if (entry.event === 'eliminated') {
+                                logHtml += `<p class="log-entry">${entry.name} was eliminated ($${entry.total}) on ${entry.timestamp}!</p>`;
+                            }
+                        });
+                    }
+                    document.getElementById("log").innerHTML = logHtml;
+
+                    // Update the standings table
                     document.getElementById("standings").innerHTML = html;
                 })
                 .catch(error => {
@@ -180,6 +275,11 @@
                     console.error("Error fetching trades:", error);
                 });
         });
+
+        // Auto-refresh the page every 60 seconds to check for updates
+        setInterval(() => {
+            location.reload();
+        }, 60000);
     </script>
 </body>
 </html>
