@@ -1,83 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The $10,000 Challenge</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        h1, h2, h3 {
-            color: #333;
-            text-align: center;
-        }
-        p {
-            text-align: center;
-            color: #666;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            background-color: #fff;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        th {
-            background-color: #4CAF50;
-            color: white;
-        }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        tr:hover {
-            background-color: #f1f1f1;
-        }
+        body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+        h1, h2 { color: #333; }
+        h2 { margin-top: 40px; }
+        table { margin: 20px auto; border-collapse: collapse; width: 80%; }
+        th, td { border: 1px solid #ccc; padding: 12px; text-align: left; }
+        th { background-color: #f0f0f0; font-weight: bold; }
         .avatar { font-weight: bold; }
-        .negative { color: red; font-weight: bold; }
-        .status { font-size: 0.9em; color: #666; }
-        .liquidation-note { color: red; font-style: italic; text-align: center; }
-        #negative-comments p {
-            color: red;
-            font-style: italic;
-            text-align: center;
-            margin: 10px 0;
-        }
-        #daily-trades {
-            margin-top: 20px;
-        }
-        #daily-trades div {
-            background-color: #fff;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-        #daily-trades h3 {
-            margin: 0 0 10px 0;
-            color: #4CAF50;
-        }
-        .log { margin-top: 20px; font-size: 0.9em; color: #333; border-top: 1px solid #ccc; padding-top: 10px; }
-        .log-entry { color: #d32f2f; }
+        .trade-section { margin: 20px auto; width: 80%; }
+        .trade-section div { margin-bottom: 20px; border: 1px solid #ccc; padding: 12px; background-color: #f9f9f9; }
+        .trade-section h3 { font-weight: bold; color: #333; margin-bottom: 5px; }
+        .trade-section p { margin: 5px 0; }
     </style>
 </head>
 <body>
     <h1>The $10,000 Challenge - Live Standings</h1>
     <p>Prices update live via CoinGecko. Refresh to see the latest!</p>
-    <p>Rule: Traders are out if their portfolio drops below -$10,000!</p>
-    <p class="liquidation-note">Note: In real-world trading, a negative balance would trigger liquidation (positions closed to prevent further losses), but for this game, we allow traders to continue until -$10,000.</p>
     <div id="standings"></div>
     <div id="negative-comments"></div>
-    <div id="log" class="log"></div>
 
     <h2>Daily Crypto Trades at 4 PM</h2>
     <p>Check out what each trader decided to do today at 4 PM!</p>
@@ -90,10 +33,24 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Fetch live prices from CoinGecko
-            fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,cardano,ripple,dogecoin,shiba-inu,pax-gold,solana,tether&vs_currencies=usd')
-                .then(response => response.json())
-                .then(data => {
+            // Mock API response for testing (to avoid CoinGecko API rate limit)
+            const data = {
+                "bitcoin": { "usd": 85027 },
+                "ethereum": { "usd": 1996.85 },
+                "cardano": { "usd": 0.701212 },
+                "ripple": { "usd": 2.3 },
+                "dogecoin": { "usd": 0.18 },
+                "shiba-inu": { "usd": 0.000014 },
+                "pax-gold": { "usd": 2450 },
+                "solana": { "usd": 130 },
+                "tether": { "usd": 1 }
+            };
+
+            // Comment out the fetch call for now
+            // fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,cardano,ripple,dogecoin,shiba-inu,pax-gold,solana,tether&vs_currencies=usd')
+            //     .then(response => response.json())
+            //     .then(data => {
+                    // Define avatars with entry prices (March 19, 2025)
                     const entryPrices = {
                         "bitcoin": 82047.50,
                         "ethereum": 1907.33,
@@ -112,10 +69,7 @@
                         { name: "Zoe 'Leverage Queen'", investments: { "bitcoin": -5000, "dogecoin": 3000, "shiba-inu": 2000 } }
                     ];
 
-                    // Load existing log and previous totals from localStorage
-                    let log = JSON.parse(localStorage.getItem('challengeLog')) || [];
-                    let previousTotals = JSON.parse(localStorage.getItem('previousTotals')) || {};
-
+                    // Build the standings table
                     let html = "<table><tr><th>Trader</th><th>Investments</th><th>Total Value</th></tr>";
                     const negativeComments = document.getElementById('negative-comments');
                     avatars.forEach(player => {
@@ -129,76 +83,23 @@
                             if (player.name === "Zoe 'Leverage Queen'") {
                                 leverage = (coin === "bitcoin" && amount < 0) ? 10 : (coin === "dogecoin") ? 5 : 1;
                             }
+                            // Calculate units bought/shorted at entry price
                             let units = amount / entryPrice;
+                            // Current value without leverage
                             let value = units * currentPrice;
+                            // Apply leverage to gains/losses (not principal)
                             let leveragedValue = amount + (value - amount) * leverage;
                             total += leveragedValue;
                             details += `${coin.toUpperCase()}: $${amount.toFixed(2)} → $${leveragedValue.toFixed(2)}<br>`;
                         }
+                        html += `<tr><td class="avatar">${player.name}</td><td>${details}</td><td>$${total.toFixed(2)}</td></tr>`;
 
-                        // Check for huge changes (10% or more)
-                        const timestamp = new Date().toLocaleString();
-                        const previousTotal = previousTotals[player.name] || 10000; // Default to starting $10,000 if no previous total
-                        const percentageChange = previousTotal !== 0 ? Math.abs((total - previousTotal) / previousTotal) * 100 : 0;
-                        if (percentageChange >= 10) {
-                            const alreadyLoggedChange = log.some(entry => 
-                                entry.name === player.name && 
-                                entry.event === 'hugeChange' && 
-                                entry.total === total.toFixed(2) && 
-                                entry.timestamp === timestamp
-                            );
-                            if (!alreadyLoggedChange) {
-                                log.push({
-                                    name: player.name,
-                                    event: 'hugeChange',
-                                    total: total.toFixed(2),
-                                    percentageChange: percentageChange.toFixed(2),
-                                    timestamp: timestamp
-                                });
-                            }
-                        }
-
-                        // Check if total crosses $0 or -$10,000 and log the event
-                        if (total <= 0 && total > -10000) {
-                            const alreadyLoggedZero = log.some(entry => entry.name === player.name && entry.event === 'hitZero');
-                            if (!alreadyLoggedZero) {
-                                log.push({
-                                    name: player.name,
-                                    event: 'hitZero',
-                                    total: total.toFixed(2),
-                                    timestamp: timestamp
-                                });
-                            }
-                        }
-                        if (total <= -10000) {
-                            const alreadyLoggedEliminated = log.some(entry => entry.name === player.name && entry.event === 'eliminated');
-                            if (!alreadyLoggedEliminated) {
-                                log.push({
-                                    name: player.name,
-                                    event: 'eliminated',
-                                    total: total.toFixed(2),
-                                    timestamp: timestamp
-                                });
-                            }
-                        }
-
-                        // Add status message if negative
-                        let status = total < 0 ? `<br><span class="status">At risk! Needs $${(10000 + total).toFixed(2)} to get back to $10,000.</span>` : "";
-                        if (total <= -10000) {
-                            status = `<br><span class="status">Eliminated! Portfolio below -$10,000.</span>`;
-                            total = 0; // Set to 0 for display purposes if eliminated
-                        }
-                        // Apply negative class if total is negative
-                        let totalClass = total < 0 ? "negative" : "";
-                        html += `<tr><td class="avatar">${player.name}${status}</td><td>${details}</td><td class="${totalClass}">$${total.toFixed(2)}</td></tr>`;
-
-                        // Update previous total for this trader
-                        previousTotals[player.name] = total;
-
-                        // Add negative comments (from local version)
+                        // Add a comment if the portfolio value is negative
                         if (total < 0) {
                             const comment = document.createElement('p');
-                            const initialValue = 10000;
+                            comment.style.color = 'red';
+                            // Calculate hypothetical exit date (assuming drop from $10,000 to current value over 90 days)
+                            const initialValue = 10000; // Starting value on January 1, 2025
                             const currentValue = total;
                             const totalDrop = initialValue - currentValue;
                             const dropToZero = initialValue;
@@ -211,39 +112,18 @@
                             comment.textContent = `${player.name}'s portfolio value is $${total.toFixed(2)}, below $0, but they are still playing due to the -$10,000 limit. Without the -$10,000 limit, ${player.name} would have been out of the show on ${exitDate}.`;
                             if (negativeComments) {
                                 negativeComments.appendChild(comment);
+                            } else {
+                                console.error("Element with ID 'negative-comments' not found in the DOM.");
                             }
                         }
                     });
                     html += "</table>";
-
-                    // Save the updated log and previous totals to localStorage
-                    localStorage.setItem('challengeLog', JSON.stringify(log));
-                    localStorage.setItem('previousTotals', JSON.stringify(previousTotals));
-
-                    // Display the log
-                    let logHtml = "<h3>Event Log</h3>";
-                    if (log.length === 0) {
-                        logHtml += "<p>No events yet.</p>";
-                    } else {
-                        log.forEach(entry => {
-                            if (entry.event === 'hugeChange') {
-                                logHtml += `<p class="log-entry">${entry.name}'s portfolio changed by ${entry.percentageChange}% to $${entry.total} on ${entry.timestamp}!</p>`;
-                            } else if (entry.event === 'hitZero') {
-                                logHtml += `<p class="log-entry">${entry.name} hit $0 or below ($${entry.total}) on ${entry.timestamp}!</p>`;
-                            } else if (entry.event === 'eliminated') {
-                                logHtml += `<p class="log-entry">${entry.name} was eliminated ($${entry.total}) on ${entry.timestamp}!</p>`;
-                            }
-                        });
-                    }
-                    document.getElementById("log").innerHTML = logHtml;
-
-                    // Update the standings table
                     document.getElementById("standings").innerHTML = html;
-                })
-                .catch(error => {
-                    document.getElementById("standings").innerHTML = "Oops! Couldn’t load prices. Try refreshing.";
-                    console.error(error);
-                });
+            //     })
+            //     .catch(error => {
+            //         document.getElementById("standings").innerHTML = "Oops! Couldn’t load prices. Try refreshing.";
+            //         console.error(error);
+            //     });
 
             // Fetch and display daily trades at 4 PM
             fetch('trades.json')
@@ -275,11 +155,6 @@
                     console.error("Error fetching trades:", error);
                 });
         });
-
-        // Auto-refresh the page every 60 seconds to check for updates
-        setInterval(() => {
-            location.reload();
-        }, 60000);
     </script>
 </body>
 </html>
